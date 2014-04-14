@@ -14,7 +14,11 @@
 
 //B Visual studio 2012 нет поддержки log2
 inline float log2(float n) {
-  return log(n) / log(2.0);
+	if (n==0)
+	{
+		return 0;
+	}
+	return log(n) / log(2.0);
 }
 
 
@@ -28,11 +32,20 @@ inline void SetApp(void)
 	SetConsoleOutputCP(1251);
 }
 
+
+struct result // Сруктура хранения информации
+{
+	float freq[AlfabetN];
+	float H,Hmax;
+}res;
+
 //Оценка энтропии, одиночные символы
 float entropy_1 (char *fn)
 {
 	FILE *fi;
 	float freq[AlfabetN] = {0};
+	float H=0,Hmax=0; 
+	int K=0;
 	int ch=EOF;
 	long total=0;
 	puts("Файл:");	
@@ -45,31 +58,43 @@ float entropy_1 (char *fn)
         return -1;
     }
 	
-	_locale_t m_locale;
 	
-	 m_locale =  _get_current_locale();
-	 wprintf(L"%ls sdsd\n",m_locale->locinfo->locale_name);
 	while((ch = fgetc(fi)) != EOF)
     {
-		printf("%c", ch);
-        if(_isalpha_l(ch,m_locale))
+		//Если англ или рус алфавит
+        if(isalpha(ch)||strchr("ЁЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮёйцукенгшщзхъфывапролджэячсмитьбю", ch))
         {
-            ch = _tolower_l(ch,m_locale);
-            //if(ch == toascii('ё')) ch = toascii('е');
-            freq[ch]++;
-            total++;            
+			if (strchr("ЁЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ", ch))//Если Заглавные рус
+			{
+				if ( ch == 0xA8)								//Отдельно для Ё
+				{
+					ch=0xB8;
+				}else
+				{
+					ch=ch-0xC0+0xE0;							//А и а рус
+				}
+				freq[ch]++;
+				total++;            
+			}else{
+				ch = tolower(ch);           
+				freq[ch]++;
+				total++;            
+			}
         }
         else 
         {
-			if (ch == ' ')
+			if (ch == ' ')										//пробел
 			{
 				freq[ch]++;
 				total++;            
 			}else
 			{
-				ch = '.'; // всё остальное
-				freq[ch]++;
-				total++;            
+				 if (strchr("-.,:!?;", ch))						//знаки припинания
+				 {
+					ch = '.';				
+					freq[ch]++;
+					total++;            
+				 }
 			}
         }
  
@@ -80,22 +105,180 @@ float entropy_1 (char *fn)
 		
 		if (freq[i]!=0)
 		{
+			//printf("freq =%3.0f ",freq[i]);
 			freq[i] = freq[i]/total;
-			printf("P[%c] = %1.3f\n",i,freq[i]);
+			printf("P[%c] = %1.3f\n",i,freq[i]);			
+			H = H + freq[i]*log2(freq[i]);
+			K++;
 		}
 	}
-	printf("я = %c", _tolower_l( 'Я',m_locale));
+	for (int i = 0; i < AlfabetN; i++)
+	{
+		res.freq[i]=0;
+		res.freq[i]=freq[i];
+	}
+	res.H = H;
 	
-	_free_locale(m_locale);
+	
+	Hmax=log2(K);
+	
+	if (Hmax==0)Hmax=1;
+	
+	res.Hmax =  Hmax;
+	printf("Всего символов в файле: %d\n",total);
+	printf("Всего символов в алфавите: %d\n",K);
+	printf("Энтропия файла: %3.3f\n",(-1)*H);	
+	printf("Максимальная Энтропия файла: %3.3f\n",Hmax);
+	
+	printf("Избыточность текста составила: %3.3f\n",1 + H/Hmax);
+	
+	fclose(fi);
 	system("PAUSE");
 	return 0;
 }
 
 //Оценка энтропии, пары символов
-float entropy_2 (char *fl)
+float entropy_2 (char *fn)
 {
-	puts("Файл:");	
-	puts(fl);
+	FILE *fi;
+	float freq2[AlfabetN][AlfabetN] = {0};
+	float H2=0; 
+	
+	int ch=EOF,lastch=EOF;;
+	long sum=0;
+	
+	entropy_1(fn);
+
+	fi = fopen(fn, "r");
+	if(fi == NULL)
+    {
+        puts("Такой файл не найден!");
+		system("Pause");
+        return -1;
+    }
+	while((ch = fgetc(fi)) != EOF)
+	{
+		sum++;
+	}
+	if (sum<2||sum==0)
+	{
+		puts("в файле нет пар символов");
+		system("Pause");
+        return -2;
+	}
+	rewind(fi);
+	lastch= fgetc(fi);
+	//Если англ или рус алфавит
+	if(isalpha(lastch)||strchr("ЁЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮёйцукенгшщзхъфывапролджэячсмитьбю", lastch))
+        {
+			if (strchr("ЁЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ", lastch))	//Если Заглавные рус
+			{
+				if ( lastch == 0xA8)									//Отдельно для Ё
+				{
+					lastch=0xB8;
+				}else
+				{
+					lastch=lastch-0xC0+0xE0;							//А и а рус
+				}				            
+			}else{
+				lastch = tolower(lastch);           				        
+			}
+        }
+        else 
+        {
+			
+				 if (strchr("-.,:!?;", lastch))							//знаки припинания
+				 {
+					lastch = '.';									        
+				 }
+			
+        }
+
+	while((ch = fgetc(fi)) != EOF)
+    {
+		//Если англ или рус алфавит
+        if(isalpha(ch)||strchr("ЁЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮёйцукенгшщзхъфывапролджэячсмитьбю", ch))
+        {
+			if (strchr("ЁЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ", ch))//Если Заглавные рус
+			{
+				if ( ch == 0xA8)								//Отдельно для Ё
+				{
+					ch=0xB8;
+				}else
+				{
+					ch=ch-0xC0+0xE0;							//А и а рус
+				}
+				freq2[lastch][ch]++;
+				lastch=ch;
+			}else{
+				ch = tolower(ch);           
+				freq2[lastch][ch]++;				            
+				lastch=ch;
+			}
+        }
+        else 
+        {
+			if (ch == ' ')										//пробел
+			{
+				freq2[lastch][ch]++;
+				lastch=ch;
+			}else
+			{
+				 if (strchr("-.,:!?;", ch))						//знаки припинания
+				 {
+					ch = '.';				
+					freq2[lastch][ch]++;
+					lastch=ch;
+				 }
+			}
+        }
+ 
+    }
+
+	
+
+	for (int i = 0; i < AlfabetN; i++)
+	{
+		sum=0;
+		for (int j = 0; j < AlfabetN; j++)
+		{
+			sum=sum+freq2[i][j];
+		}
+		
+		for (int j = 0; j < AlfabetN; j++)
+		{
+			
+			
+				freq2[i][j]=freq2[i][j]/sum;
+			//if(freq2[i][j]>0)	printf("P2[%c][%c]= %f\n",i,j,freq2[i][j]);
+			
+		}
+	}
+	
+	H2=0;
+	
+	for (int i = 0; i < AlfabetN; i++)
+	{
+		for (int j = 0; j < AlfabetN; j++)
+		{
+			
+			if(freq2[i][j]>0 )
+			{
+				H2=H2+res.freq[i]*freq2[i][j]*log2(freq2[i][j]);
+			}
+		}
+	}
+	
+	
+	printf("Энтропия файла для пар символов: %3.3f\n",(-1)*H2);	
+	printf("Максимальная Энтропия файла: %3.3f\n",res.Hmax);
+	if (res.Hmax==0)res.Hmax=1;
+	printf("Избыточность текста для пар символов составила: %3.3f\n",1 + H2/res.Hmax);
+	
+	fclose(fi);
+	system("PAUSE");
+
+
 	return 0;
 }
 
@@ -132,7 +315,7 @@ int _tmain(int argc, _TCHAR* argv[])
 {
 	
 	float freq2[AlfabetN][AlfabetN] = {0};
-	char FILENAME[200];
+	char FILENAME[200]={NULL};
 
 
 	SetApp ();
@@ -140,10 +323,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	{
 		switch (Menu(1))
 		{
-			case '1': fflush(stdin); system("DIR /a:-d"); puts("Первая буква Большая!\n"); gets(FILENAME);
+			case '1': fflush(stdin); system("DIR /a:-d"); puts("Введите имя файла\n"); gets(FILENAME);
 				break;
 			case '2': entropy_1( FILENAME);break;
-			case '3': entropy_1( FILENAME);break;
+			case '3': entropy_2( FILENAME);break;
 			case '4': return 0;
 			default:break;
 		}
